@@ -8,7 +8,7 @@ This is proof of concept code and is not very durable nor complete.
 
 Screenshots:
 
-<img src="http://macdevshop.com/images/twitterHome.jpg" />&nbsp;&nbsp;&nbsp;<img src="http://macdevshop.com/images/twitterUser.jpg" /> 
+<img style="border: 1px solid black;" src="http://macdevshop.com/images/twitterHome.jpg" />&nbsp;&nbsp;&nbsp;<img style="border: 1px solid black;" src="http://macdevshop.com/images/twitterUser.jpg" /> 
 
 To try the code in action, visit:
 
