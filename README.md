@@ -6,6 +6,10 @@ My goal was to create a standalone webpage application that self generates its p
 
 This is proof of concept code and is not very durable nor complete.
 
+Screenshots:
+
+<img src="http://macdevshop.com/images/twitterHome.jpg" />    <img src="http://macdevshop.com/images/twitterUser.jpg" /> 
+
 To try the code in action, visit:
 
 <a href="http://macdevshop.com/twitter/index.html">http://macdevshop.com/twitter/index.html</a>
