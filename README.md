@@ -8,7 +8,7 @@ This is proof of concept code and is not very durable nor complete.
 
 To try the code in action, visit:
 
-  http://macdevshop.com/twitter/index.html
+<a href="http://macdevshop.com/twitter/index.html">http://macdevshop.com/twitter/index.html</a>
   
 How to use this code
 ==================
