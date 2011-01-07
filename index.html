@@ -1,0 +1,717 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html> 
+<head> 
+	<meta charset="utf-8" /> 
+  
+	<title>Twitter-Mobile</title> 
+	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.0a2/jquery.mobile-1.0a2.min.css" />
+	<script src="http://code.jquery.com/jquery-1.4.4.min.js"></script>
+  <script type="text/javascript" src="http://code.jquery.com/mobile/1.0a2/jquery.mobile-1.0a2.min.js"></script> 
+  <script src="http://platform.twitter.com/anywhere.js?id=C4vv3E46DAprDT8m7pO0sw&v=1" type="text/javascript"></script>
+</head> 
+<body> 
+
+<style>
+  /* customize jquerymobile css for this application   */
+  
+  .ui-li .ui-btn-inner { padding: .7em 50px .7em 15px; }
+  .ui-li-has-thumb .ui-btn-inner { min-height: 45px; padding: .7em 45px .7em 55px; }
+  .ui-li-heading { margin: 0em 0 0.6em 0; }
+  .ui-li-desc {  margin: -.5em 0 .6em; text-overflow: ellipsis; overflow: visible; white-space: pre-line; }
+  .ui-li-thumb, .ui-li-icon { top: 13px; }
+  
+  .ui-input-search { width: 40% !important;}
+</style>
+
+<script type="text/javascript">
+
+/*
+  Copyright (c) 2010 Richard Sepulveda 
+
+  Permission is hereby granted, free of charge, to any person obtaining
+  a copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+  Twitter-Mobile is a Twitter client for mobile devices using jQuery Mobile and the twitter @anywhere API
+  My goal was to create a standalone webpage that self generates its pages based on interaction
+  with twitter.com. (no further interaction is required with the originating server)
+  
+  See the README for installation instructions, etc.
+  
+*/
+
+  phistory = [];          // stack of pages
+  myCurrentUser = null;   // the current logged in user data
+  
+  // user pressed the backbutton on a page
+  function backButton()
+  {
+    // we pop the top page unless we are already on the bottom
+    current = phistory[0];
+    if( phistory.length > 1)
+    {
+      phistory.length = phistory.length - 1;
+      current = phistory[phistory.length - 1];
+    }
+    else
+      return;
+    
+    // now tell jquerymobile to display the top-of-stack page
+    var newtitle = title = current;
+    if( title[0] == '@')
+      newtitle = "AT_" + title.substr( 1, title.length - 1);
+    if( title[0] == '#')
+      newtitle = "LB_" + title.substr( 1, title.length - 1);
+      
+    stitle = '#' + newtitle;
+    
+    $.mobile.changePage($(stitle));          
+  }
+    
+  // display the specified tweet data (timeline, @user, #subject)
+  function fetchPage(current)
+  {
+    $.mobile.pageLoading();  // page loading animation
+    
+    if( current == "Timeline"){   // user's home timeline
+      twttr.anywhere(function (T) {    
+        T.User.current().homeTimeline({count:50, success:function(statuses){
+          $.mobile.pageLoading(true);
+          updateStatusPage(T, statuses.array, current);            
+        }});                         
+      });  
+    }
+    else if( current[0] == '@'){  // grab specified user's tweets
+      twttr.anywhere(function (T) {  
+        T.User.find(current.substr(1,current.length - 1)).timeline({count:50, success:function(statuses){
+          $.mobile.pageLoading(true);        
+          updateStatusPage(T, statuses.array, current);
+        }});
+      });
+    }
+    else if( current[0] == '#'){ // grab tweets containing specified string
+        var url = 'http://search.twitter.com/search.json?q=' + encodeURIComponent(current);
+        
+        $.getJSONP({
+          url:url,
+          timeout: 30000,
+          data: {rpp:50},          
+          error: function(xhr, status, e) {
+            alert( "failWhale(e);");
+          },
+          success: function(json) {
+            $.mobile.pageLoading(true);
+          
+            if (json.error) {
+              alert( "failWhale(e);"); //					failWhale(json.error);
+              return;
+            }
+
+            twttr.anywhere(function (T) {    
+              updateStatusPage(T, json.results, current);
+            });
+          }
+        });
+    }
+    
+    return false;
+  }
+  
+  // fn to handle jsonp with timeouts and errors
+  // hat tip to Ricardo Tomasi for the timeout logic
+  $.getJSONP = function(s) {
+    s.dataType = 'jsonp';
+    $.ajax(s);
+
+    // figure out what the callback fn is
+    var $script = $(document.getElementsByTagName('head')[0].firstChild);
+    var url = $script.attr('src') || '';
+    var cb = (url.match(/callback=(\w+)/)||[])[1];
+    if (!cb)
+        return; // bail
+    var t = 0, cbFn = window[cb];
+
+    $script[0].onerror = function(e) {
+        $script.remove();
+        handleError(s, {}, "error", e);
+        clearTimeout(t);
+    };
+
+    if (!s.timeout)
+        return;
+
+    window[cb] = function(json) {
+        clearTimeout(t);
+        cbFn(json);
+        cbFn = null;
+    };
+
+    t = setTimeout(function() {
+        $script.remove();
+        handleError(s, {}, "timeout");
+        if (cbFn)
+            window[cb] = function(){};
+    }, s.timeout);
+    
+    function handleError(s, o, msg, e) {
+        // support jquery versions before and after 1.4.3
+        ($.ajax.handleError || $.handleError)(s, o, msg, e);
+    }
+  };  
+  
+  // this is called when we want to send any kind of message( tweet, reply, direct message)
+  function sendMessage(title,id,callback,msg)
+  {  
+    // set title of message page
+    $('.tweetTitle').html(title);
+    
+    $('.tweetText').attr("value", (msg==undefined)?"":msg);
+
+    // display the page
+    phistory[phistory.length] = "message_page";                      
+    $.mobile.changePage($('#message_page'));   
+  
+    // if user presses send, we grab the message and call the callback to complete the send
+    $('.sendButton').click( function(){
+      msg = $(".tweetText").attr("value");
+      
+      if( msg.length <= 0){
+        alert( "You can't send an empty message");
+        return false;
+      }
+  
+      callback(id,msg);
+
+      return false;
+    });  
+  }
+  
+  // gets a user's twitter profile and display's it
+  function profile(user)
+  {
+    twttr.anywhere(function (T) {
+  
+      // the only way that i have found to get User data is to look in the tweet data that the user has sent
+      T.User.find(user.substr(1,user.length - 1)).timeline({ success:function(statuses){
+      
+        var userData=statuses.array[0].user; // just get the user's first tweet and extract the User structure
+        
+        var str="";
+        
+        str += '<p style="padding:5px;">';
+        str += "Screen Name: " + userData.screenName + "<br />";
+        str += "Biography: " + (userData.description || " ") + "<br />";
+        str += "Statuses: " + userData.statusesCount + "<br />";
+        str += "Followers: " + userData.followersCount + "<br />";
+        str += "Following: " + userData.friendsCount + "<br />";
+        str += "Favourites: " + userData.favouritesCount + "<br />";
+        str += "Location: " + (userData.location || " ") + "<br />";
+        str += "Website: " + (userData.url || " ") + "<br />";
+        str += "</p>";
+        
+        $("#profile_page .pbox").html(str);
+        $('#profile_page .rtitle').html( user + " Profile");
+        
+        // push the page on the stack and display it
+        phistory[phistory.length] = user;      
+        $.mobile.changePage($('#profile_page'));
+      }});      
+    });          
+  }
+    
+  // this builds the tweet page (home timeline, @user, or #subject)
+  function updateStatusPage(T, statuses, title, displayPage)
+  {
+    if( displayPage == undefined) // do we also want to display the page after it is built?
+      displayPage = true;
+      
+    // build the ul/li markup for the statuses(tweets)
+    var str = "";
+    str += '<ul data-role="listview">';
+
+    for( var i=0; i<statuses.length; ++i)
+    {
+      var status = statuses[i];
+      
+      // we find all linkable items in the tweet, http:, @user, #subject and embed them in <span> tags
+      // we install the real handlers for these a-tags later
+      var text = status.text.replace(/(http:\/\/[^\s]+)/g, "<span class='atag' href='$&'></span>");
+      var text = text.replace(/(#[^:\s]+)/g, "<span class='btag' href='$&'></span>");
+      var text = text.replace(/(@[^:\s]+)/g, "<span class='btag' href='$&'></span>");
+
+      // calculate the age of the tweet
+      if( status.createdAt)
+        var createdAt = status.createdAt;
+      else
+        var createdAt = status.created_at;
+
+      var createdDate = new Date(createdAt);
+      
+      var nowDate = new Date();
+      
+      var diff = nowDate - createdDate;
+      var milliseconds=Math.floor(diff % 1000);   
+          diff=diff/1000;            
+      var seconds=Math.floor(diff % 60);
+          diff=diff/60;
+      var minutes=Math.floor(diff % 60);
+          diff=diff/60;
+      var hours=Math.floor(diff % 24);
+          diff=diff/24;
+      var days=Math.floor(diff);            
+      
+      if( hours <= 0){
+        if( minutes == 1)
+          createdAt = minutes + " minute ago";
+        else
+          createdAt = minutes + " minutes ago";              
+      } 
+      else if( hours < 24) { 
+        if( hours == 1)
+          createdAt = hours + " hour ago";
+        else
+          createdAt = hours + " hours ago";              
+      }
+      else {
+        if( days == 1)
+          createAt = days + " day ago";
+        else
+          createAt = days + " days ago";                            
+      }
+      
+      // build the li for this tweet
+      // we look at different 'status' structure names depending on the where we got the statuses
+      if( status.user)
+      {
+        str += 
+        "<li class='tweet-li'>"+
+        "   <img src='" + status.user.profileImageUrl + "' />"+
+        "   <h4><a href='#' class='status_reply' status_id='@" + status.user.screenName + "'>" + 
+              status.user.name + "<span style='font-weight:normal;'>&nbsp;&nbsp;(" + createdAt + ")</span>" +
+        "   </a></h4>"+
+        "   <p>" + text + "</p>"+
+        "</li>";
+      }
+      else
+      {
+        str += 
+        "<li class='tweet-li'>"+
+        "   <img src='" + status.profile_image_url + "' />"+
+        "   <h4><a href='#' class='status_reply' status_id=''>" +
+              status.from_user + "<span style='font-weight:normal;'>&nbsp;&nbsp;(" + createdAt + ")</span>"+
+        "   </a></h4>"+
+        "   <p>" + text + "</p>"+
+        "</li>";        
+      }
+    }
+    
+    str += '</ul>';   
+    
+    // build the title for this page
+    var rtitle = title;
+    if( title == "Timeline"){
+      screenName = myCurrentUser.data('screen_name');
+      rtitle = "@" + screenName + " Timeline";      
+    }
+
+    // build the id for this jquery mobile 'page' (we can't use @ or # in name so we change the name)
+    var newtitle = title;
+    if( title[0] == '@')
+      newtitle = "AT_" + title.substr( 1, title.length - 1);
+    if( title[0] == '#')
+      newtitle = "LB_" + title.substr( 1, title.length - 1);
+      
+    // build the jquery selector for this 'page'
+    var stitle = '#' + newtitle;
+    
+    // is this page already in the DOM? If not, we clone the template and modify it
+    if( $(stitle).length <= 0)
+    {
+      var $clone = $("#default_page").clone();
+      
+      $clone.attr("id",newtitle);   // set the id of the 'page'
+      
+      $("#anywhere").after($clone); // put the clone in the DOM
+      
+      // set some internal data for the 'page'
+      jQuery.data( $(stitle)[0], "page_data", { title: title, id: stitle });
+    
+      // set the page title and back button visible
+      $( stitle + ' .rtitle').html(rtitle);    
+      $( stitle + ' .myheader').attr( 'data-nobackbtn', (phistory.length<=1)?'true':'false');
+     
+      // if this page is for a @user, we display the twitter follow user button
+      if( title[0] == '@'){   
+        twttr.anywhere(function (T) { 
+          $(stitle + " .follow-twitterapi").html("");
+          T(stitle + " .follow-twitterapi").followButton(title.substr(1,title.length - 1));
+        });
+      }      
+      
+      // workaround for strange bug cloning a page with search included
+      $( stitle + ' .content').prepend(
+  '    <form action="#" class="searchForm">'+
+  '      <div data-role="fieldcontain" style="padding:0; margin:0 0 25px 0;">'+
+//'        <label for="search">Search:</label>'+
+  '        <input type="search" name="search" class="search" value="" />'+
+  '      </div>'+
+  '    </form>');
+      $( stitle + ' .searchForm').page();
+      
+      // setup the buttons on the footer
+      $(stitle + " .action-buttons").attr("status_id", title);
+      
+      // we hide the reply button, direct message button and profile button on Home page and #subject pages
+      if( title[0] == '#' || title == 'Timeline'){
+        var selector = stitle + " a.publicReplyButton," + stitle + " a.directMsgButton," + stitle + " a.profileButton";
+        $(selector).css("visibility","hidden");
+      }
+
+      // setup the search field callback
+      $(stitle + " .searchForm").submit( function(){
+      
+        // get the search string and call twitter search, then display the status results
+        var searchVal = $(stitle + " .search").attr("value");
+        var url = 'http://search.twitter.com/search.json?q=' + encodeURIComponent( searchVal);
+        
+        $.getJSONP({
+          url:url,
+          timeout: 30000,
+          data: {rpp:50},
+          error: function(xhr, status, e) {
+            alert( "failWhale(e);");
+          },
+          success: function(json) {
+            if (json.error) {
+              alert( "failWhale(e);"); // failWhale(json.error);
+              return;
+            }
+
+           twttr.anywhere(function (T) {    
+              updateStatusPage(T, json.results, searchVal);            
+            });
+          }
+        });      
+        
+        return false;
+      });
+      
+      // send a direct message to @user callback
+      $(stitle + " .directMsgButton").click( function(){
+        sendMessage("Direct Message to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
+          
+        twttr.anywhere(function (T) {
+          T.DirectMessage.send(id, msg, {success: function(){
+              alert("Message successfully sent to " + id);
+            }, error:function(){ 
+              alert("Error sending message to " + id); 
+            }});
+          });
+          
+          return false;
+        });
+        
+        return false;
+      });
+      
+      // send a public reply to @user callback      
+      $(stitle + " .publicReplyButton").click( function(){
+
+        sendMessage("Reply to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
+          
+        twttr.anywhere(function (T) {
+          T.Status.reply( 0, msg, {success: function(){
+              alert("Message successfully sent to " + id);
+            }, error:function(){ 
+              alert("Error sending message to " + id); 
+            }});
+          });
+          
+          return false;
+        }, $(this).attr("status_id") + " ");
+        
+        return false;
+      });
+      
+      // display user's profile callback
+      $(stitle + " .profileButton").click( function(){
+        profile($(this).attr("status_id"));      
+        return false;
+      });
+      
+      // send a tweet button callback
+      $(stitle + " .sendTweetButton").click( function(){
+
+        sendMessage("Send tweet", $(this).attr("status_id"), function(id,msg){
+          
+        twttr.anywhere(function (T) {
+          T.Status.update( msg, {success: function(){
+              alert("Tweet successfully sent");
+            }, error:function(){ 
+              alert("Error sending tweet"); 
+            }});
+          });
+          
+          return false;
+        });
+        
+        return false;
+      });    
+            
+      // logout button callback
+      $(stitle + " .logoutButton").click( function(){          
+          twttr.anywhere.signOut();
+      return false;
+      });              
+    }
+    
+    // clear out the tweet section of our page and insert the fresh data
+    $( stitle + ' .tweets').html("");
+    $( stitle + ' .tweets').append(str);
+    
+    $( stitle + " ul").page();  // now get jquerymobile to add its special markup to our markup
+  
+    // if we want to display the page, we push our hash history and tell jqm to change the page
+    if( displayPage){
+      phistory[phistory.length] = title;                      
+      $.mobile.changePage(stitle); 
+    }
+  
+    // convert the embedded span tags into <a> tags. we did this because jqm manipulates <a> tags in unwanted ways
+    $(stitle + " span.atag").each( function(){
+      $(this).after( "<a class='aref' href='" + $(this).attr("href") + "'>" + $(this).attr("href") + "</a>");      
+    });
+        
+    $(stitle + " span.btag").each( function(){
+      $(this).after( "<a class='bref' href='" + $(this).attr("href") + "'>" + $(this).attr("href") + "</a>");      
+    });    
+        
+    // user pressed a @user or #subject embedded in the tweet
+    $(stitle + " a.bref").click( function(){
+      href = $(this).attr("href");
+      
+      fetchPage( href); // display the page associated with this @user or #subject
+      
+      return false;
+    });       
+    
+    // user pressed the thumbnail or title   
+    $(stitle + " a.status_reply").unbind();
+    $(stitle + " a.status_reply").click( function(){
+
+      href = $(this).attr("status_id");
+      
+      fetchPage( href); // display the page associated with this @user or #subject
+      
+      return false;   
+    });
+    
+    // button at the right of tweet (reply to tweet)
+    $(stitle + " span.ui-icon").unbind();
+    $(stitle + " span.ui-icon").click( function(){
+    
+      // find the owner of this tweet (stored in the $("a.status_reply) tag in attribute "status_id"
+      var id = $(this).siblings().find("a.status_reply").attr("status_id");
+      
+      sendMessage("Reply to " + id, id, function(id,msg){
+        
+      twttr.anywhere(function (T) {
+        T.Status.reply( 0, msg, {success: function(){
+            alert("Message successfully sent to " + id);
+          }, error:function(){ 
+            alert("Error sending message to " + id); 
+          }});
+        });
+        
+        return false;
+      }, id + " ");
+      
+      return false;
+    });
+    
+  }  // end updateStatusPage()
+        
+  // this is called on startup to see if we are already logged into twitter, if not, we display
+  // a twitter connection button otherwise we display the home timeline statuses
+  twttr.anywhere(function (T) {
+
+    if (T.isConnected()) {
+      fetchPage("Timeline");
+      myCurrentUser = T.currentUser;  
+          
+    } else {
+      $("#twitter-connect-placeholder").html("");
+                  
+      T("#twitter-connect-placeholder").connectButton({
+        authComplete: function(user) {        
+          fetchPage("Timeline");
+          myCurrentUser = T.currentUser;                
+        },
+        signOut: function() {
+          // triggered when user logs out
+        }
+      });      
+    };          
+  });
+  
+  // this gets called anytime we login or logout of twitter
+  twttr.anywhere(function (T) {
+
+    T.bind("authComplete", function (e, user) { // triggered when auth completed successfully
+    });
+
+    T.bind("signOut", function (e) { 
+      phistory.length = 0;  // clear the history hash
+      
+      $("#twitter-connect-placeholder").html("");
+
+      $.mobile.changePage($("#login_page"));   // display login page
+              
+      T("#twitter-connect-placeholder").connectButton({
+        authComplete: function(user) {
+          fetchPage("Timeline");     
+          myCurrentUser = T.currentUser;                     
+        },
+        signOut: function() {
+          // triggered when user logs out
+        }
+      });              
+    });
+  });
+  
+  // autorefresh the home timeline
+  autorefreshTime = 10; // in minutes
+  
+  refreshTimeline();
+  
+  function refreshTimeline()
+  {
+    if( $("#Timeline").length){
+      twttr.anywhere(function (T) {  
+        $.mobile.pageLoading();       
+        T.User.current().homeTimeline({count:50, success:function(statuses){
+          $.mobile.pageLoading(true);
+          updateStatusPage(T, statuses.array, "Timeline", false);            
+        }});                         
+      });    
+    }
+    
+    setTimeout(function(){
+      refreshTimeline()    
+    }, autorefreshTime * 60 * 1000);       
+  }
+    
+</script>
+  
+<div id="login_page" data-role="page" class="foo">
+  <div class="myheader" data-role="header" data-position="fixed" data-nobackbtn="true">
+<!-- <a class="back-btn" href="#" data-icon="arrow-l" onclick="backButton();">Back</a>   -->
+    
+    <h1 class="rtitle">Twitter Login</h1>
+  </div>
+
+  <div class="content" data-role="content" style="">  
+    <div id="twitter-connect-placeholder"></div>
+  </div>
+  
+  <div data-role="footer" data-position="fixed">
+  </div>
+</div>
+
+<div id="default_page" data-role="page" class="foo">
+    
+  <div class="myheader" data-role="header" data-position="fixed" data-nobackbtn="true">
+    <a class="back-btn" href="#" data-icon="arrow-l" onclick="backButton();">Back</a>  
+    
+    <h1 class="rtitle"></h1>
+
+    <a class="sendTweetButton" status_id="" href="#" class="ui-btn-right" style="">Tweet</a>
+          
+    <span class="follow-twitterapi"></span>
+  </div>
+
+  <div class="content" data-role="content" style="">  
+    <div class="tweets"></div>    
+  </div>
+  
+  <div class="footer" data-role="footer" data-position="fixed" >
+    <a href="#" data-role="button" class="logoutButton">Logout</a>    
+    <a href="#" data-role="button" class="action-buttons publicReplyButton" status_id="">Reply</a>
+    <a href="#" data-role="button" class="action-buttons directMsgButton" status_id="">Direct Msg</a>
+    <a href="#" data-role="button" class="action-buttons profileButton" status_id="">Profile</a>
+  </div>  
+</div>
+
+<div id="message_page" data-role="page">
+    
+  <div class="myheader" data-role="header" data-position="fixed">
+    <a class="back-btn" href="#" data-icon="arrow-l" onclick="backButton();">Back</a>
+    
+    <h1 class="rtitle">Tweet</h1>
+  </div>
+
+  <div class="content" data-role="content" style="">
+  
+    <div class="tbox" style="">
+      <div style="padding-left:5px; width:300px;">
+        <form class="sendTweet" action="#">
+          <p style="font-size:110%;">
+            <span class="tweetTitle">@rsepulveda99</span>&nbsp;
+          </p>
+          
+          <textarea class="tweetText" style="height:85px; width:270px;"></textarea>
+          
+          <button style="float:right; height:44px; font-weight: bold; font-size: 115%%; ' + 
+            margin-bottom: 5px; margin-right: 5px;" class="sendButton" type="button">Send</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+  <div class="footer" data-role="footer" data-position="fixed" >
+    <a href="#" data-role="button" class="logoutButton">Logout</a>    
+    <a href="#" data-role="button" class="action-buttons profileButton" status_id="">Profile</a>
+  </div>  
+</div>
+
+<div id="profile_page" data-role="page">
+    
+  <div class="myheader" data-role="header" data-position="fixed">
+    <a class="back-btn" href="#" data-icon="arrow-l" onclick="backButton();">Back</a>
+    
+    <h1 class="rtitle">Profile</h1>
+  </div>
+
+  <div class="content" data-role="content" style="">
+  
+    <div class="pbox" style=""></div>
+
+  </div>
+  <div class="footer" data-role="footer" data-position="fixed" >
+    <a href="#" data-role="button" class="logoutButton">Logout</a>    
+    <a href="#" data-role="button" class="action-buttons publicReplyButton" status_id="">Reply</a>
+    <a href="#" data-role="button" class="action-buttons directMsgButton" status_id="">Direct Msg</a>
+  </div>  
+</div>
+
+<div id="anywhere"></div>
+
+</body> 
+</html> 
