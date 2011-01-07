@@ -17,10 +17,7 @@ How to use this code
 - goto dev.twitter.com and register a new twitter web application using your twitter account.
 You will need to specify an application name, the http address of your server and some other minor info. You will receive a public API key that you must include in the following script tag in the header.
 
-<pre><code>
-< script src="http://platform.twitter.com/anywhere.js?id=YOURAPI&v=1" 
-  type="text/javascript">< /script>
-</code></pre>
+       <script src="http://platform.twitter.com/anywhere.js?id=YOURAPI&v=1" type="text/javascript"></script>
 
 - access the webpage using your computer browser or mobile device browser
 - if you want to view the application in fullscreen (for an iphone/ipod touch), Select the Add to Home Screen
