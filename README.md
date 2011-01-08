@@ -83,11 +83,11 @@ This worked for the most part except the fixed function stopped working.. Appare
 Twitter @anywhere comments
 ====================
 
-- @anywhere is a nice javascript interface to the twitter restful API. The main document: http://dev.twitter.com/anywhere/begin explains how to use the basic functions (login/logout, follow, hovercard, send tweet) which are the most common things somebody wants on a website (non-twitter client).
+- @anywhere is a nice javascript interface to the twitter restful API. The main document: <a href="http://dev.twitter.com/anywhere/begin">http://dev.twitter.com/anywhere/begin</a> explains how to use the basic functions (login/logout, follow, hovercard, send tweet) which are the most common things somebody wants on a website (non-twitter client).
 
 - Twitter has many more capabilities in their restful interface that can be interesting. Like your home_timeline (i.e. tweets from people you follow). Sending tweets to specific people, profiles, etc. All of these commands aren't explained in the main document. 
 
-- There is a secondary document called the @anywhere API document http://platform.twitter.com/js-api.html which has a "very" brief outline of the other methods that can be called using this API. Some of it is wrong, unimplemented or doesn't have enough detail to be useful without actually digging around in the minimized javascript code. I believe that Twitter does that on purpose since they dont want people doing these things with this API. (Not sure why since they expose these capabilities in the restful interface, maybe it has to do with javascript being dangerous in certain instances).
+- There is a secondary document called the @anywhere API document <a href="http://platform.twitter.com/js-api.html">http://platform.twitter.com/js-api.html</a> which has a "very" brief outline of the other methods that can be called using this API. Some of it is wrong, unimplemented or doesn't have enough detail to be useful without actually digging around in the minimized javascript code. I believe that Twitter does that on purpose since they dont want people doing these things with this API. (Not sure why since they expose these capabilities in the restful interface, maybe it has to do with javascript being dangerous in certain instances).
   
 Copyright (c) 2010 Richard Sepulveda 
 
