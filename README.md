@@ -23,19 +23,19 @@ You will need to specify an application name, the http address of your server an
 
        <script src="http://platform.twitter.com/anywhere.js?id=YOURAPI&v=1" type="text/javascript"></script>
 
-- access the webpage using your computer browser or mobile device browser
+- access the webpage using your mobile device browser or computer browser
 - if you want to view the application in fullscreen (for an iphone/ipod touch), Select the Add to Home Screen
 option in Mobile Safari. Then launch the app from your home page.
 - this code will first see if you are logged into twitter, if not, it will display a twitter login
-button. When you press it, it will redirect you to login to twitter. After login, twitter will redirect
+button. When you press it, it will redirect you to twitter.com to login. After login, twitter will redirect
 you back to the webpage.
 - this app will grab your home timeline from twitter and display it on the screen
-- you can click on @user's to bring up their tweets, click on #subject's to search twitter for a keyword.
-- you can send a general tweet to the world by pressing the Tweet button in the header
-- you can reply to a user's tweet by pressing the right arrow button on the top right of each tweet
-- you can retweet by pressing the circular arrow button located at the bottom-right of each tweet
-- you can send a private message to a user by pressing the Direct Msg button in the footer
-- you can do a general search in twitter using the search box.
+- click on @user's to bring up their tweets, click on #subject's to search twitter for that keyword.
+- send a general tweet to the world by pressing the Tweet button in the header
+- reply to a user's tweet by pressing the right arrow button on the top right of each tweet
+- retweet by pressing the circular arrow button located at the bottom-right of each tweet
+- send a private message to a user by pressing the Direct Msg button in the footer
+- do random searches of twitter using the search box
 - this program will autorefresh your home_timeline (default 10 minutes).
 
 ToDo
@@ -83,11 +83,11 @@ This worked for the most part except the fixed function stopped working.. Appare
 Twitter @anywhere comments
 ====================
 
-- @anywhere is a nice javascript interface to the twitter restful API. The main document: <a href="http://dev.twitter.com/anywhere/begin">http://dev.twitter.com/anywhere/begin</a> explains how to use the basic functions (login/logout, follow, hovercard, send tweet) which are the most common things somebody wants on a website (non-twitter client).
+- @anywhere is a nice javascript interface to the twitter restful API. The main document: http://dev.twitter.com/anywhere/begin explains how to use the basic functions (login/logout, follow, hovercard, send tweet) which are the most common things somebody wants on a website (non-twitter client).
 
 - Twitter has many more capabilities in their restful interface that can be interesting. Like your home_timeline (i.e. tweets from people you follow). Sending tweets to specific people, profiles, etc. All of these commands aren't explained in the main document. 
 
-- There is a secondary document called the @anywhere API document <a href="http://platform.twitter.com/js-api.html">http://platform.twitter.com/js-api.html</a> which has a "very" brief outline of the other methods that can be called using this API. Some of it is wrong, unimplemented or doesn't have enough detail to be useful without actually digging around in the minimized javascript code. I believe that Twitter does that on purpose since they dont want people doing these things with this API. (Not sure why since they expose these capabilities in the restful interface, maybe it has to do with javascript being dangerous in certain instances).
+- There is a secondary document called the @anywhere API document http://platform.twitter.com/js-api.html which has a "very" brief outline of the other methods that can be called using this API. Some of it is wrong, unimplemented or doesn't have enough detail to be useful without actually digging around in the minimized javascript code. I believe that Twitter does that on purpose since they dont want people doing these things with this API. (Not sure why since they expose these capabilities in the restful interface, maybe it has to do with javascript being dangerous in certain instances).
   
 Copyright (c) 2010 Richard Sepulveda 
 
