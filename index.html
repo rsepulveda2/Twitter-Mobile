@@ -24,7 +24,7 @@
   
   .ui-input-search { width: 40% !important;}
   
-  .ui-btn-icon-right .ui-icon { position: absolute; top: 20%; margin-top: -9px; }
+  .ui-btn-icon-right .ui-icon { position: absolute; top: 30%; margin-top: -9px; }
   
 </style>
 
@@ -497,6 +497,25 @@
     
     $( stitle + " ul").page();  // now get jquerymobile to add its special markup to our markup
   
+    // install retweet button for each tweet
+    $(stitle + " span.ui-icon").before('<span style="right:10px; top:70%%;" class="ui-icon ui-icon-refresh"></span>');
+    $(stitle + " span.ui-icon-refresh").unbind();
+    $(stitle + " span.ui-icon-refresh").click( function(){
+      var id = $(this).closest("li.tweet-li").attr("data-tweet-id");  // get this tweet's id
+      
+      displayDialog( "Retweet", "Alert", "Are you sure that you want to send this retweet?", ["Yes","No"], id,
+        function(buttonIndex,id){
+          if( buttonIndex == '0'){  // send retweet
+            twttr.anywhere(function (T) {
+              T.Status.retweet(id);
+            });                          
+          } else {  // cancel retweet
+          }
+        });      
+      
+      return false;
+    });
+
     // if we want to display the page, we push our hash history and tell jqm to change the page
     if( displayPage){
       phistory[phistory.length] = title;                      
@@ -628,6 +647,39 @@
       refreshTimeline()    
     }, autorefreshTime * 60 * 1000);       
   }
+
+  // this routine displays a dialog with the given title's, description and button titles
+  // it calls the callback function when the user selects a button, returning the private data to complete
+  // processing  
+  function displayDialog( pageTitle, dialogTitle, dialogDescription, buttonTitles, data, callback)
+  {
+    if( callback == undefined)
+      return;
+      
+    $("#dialog_page h1.page-title").html(pageTitle||"");
+  
+    $("#dialog_page div.dialog-title").html(dialogTitle||"");
+    $("#dialog_page div.dialog-description").html(dialogDescription||"");
+    
+	// add the buttons to the page
+    $("#dialog_page div.dialog-buttons").html("");
+    for( i=0; i<buttonTitles.length; ++i){
+      $("#dialog_page div.dialog-buttons").append("<button class='dialog_button' style='width:100%%; height: 44px; " + 
+      " background:white; border-radius: 10px; font-size:110%%; margin-bottom: 10px;' href='#' name='" + i + "'>" + buttonTitles[i] + "</button><br />");
+    }
+    
+	// setup a handler to catch button click events
+    $("#dialog_page .dialog_button").click( function(){
+
+      backButton();									// pop the dialog from the screen
+      callback( $(this).attr("name"), data);		// call the user's callback with button pressed and private data
+      return false;
+	});
+
+	// this just pushes the dialog to the screen
+	phistory[phistory.length] = "dialog_page";                      
+   	$.mobile.changePage($("#dialog_page"));              
+  }
     
 </script>
   
@@ -719,6 +771,28 @@
     <a href="#" data-role="button" class="logoutButton">Logout</a>    
     <a href="#" data-role="button" class="action-buttons publicReplyButton" status_id="">Reply</a>
     <a href="#" data-role="button" class="action-buttons directMsgButton" status_id="">Direct Msg</a>
+  </div>  
+</div>
+
+<div id="dialog_page" data-role="page" style="background:gray;">
+    
+  <div class="myheader" data-role="header" data-position="fixed">
+    <a class="back-btn" href="#" data-icon="arrow-l" onclick="backButton();">Back</a>
+    
+    <h1 class="page-title"></h1>
+  </div>
+
+  <div class="content" data-role="content" style="">
+  
+    <div class="ui-body-c" style="padding:10px; border-radius: 10px;">
+      <div class="dialog-title" style="font-size: 105%; font-weight:bold; margin-bottom:10px; text-align:center;"></div>
+      <div class="dialog-description" style="width:100%; margin-bottom:20px; text-align:center;"></div>
+    
+      <div class="dialog-buttons" style="width:100%;"></div>
+    </div>
+  </div>
+  <div class="footer" data-role="footer" data-position="fixed" >
+    <a href="#" data-role="button" class="logoutButton">Logout</a>    
   </div>  
 </div>
 
