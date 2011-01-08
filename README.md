@@ -31,13 +31,15 @@ button. When you press it, it will redirect you to login to twitter. After login
 you back to the webpage.
 - this app will grab your home timeline from twitter and display it on the screen
 - you can click on @user's to bring up their tweets, click on #subject's to search twitter for a keyword.
-- you can send a general tweet to the world, reply to a user's tweet, send a private message to a user
+- you can send a general tweet to the world by pressing the Tweet button in the header
+- you can reply to a user's tweet by pressing the right arrow button on the top right of each tweet
+- you can retweet by pressing the circular arrow button located at the bottom-right of each tweet
+- you can send a private message to a user by pressing the Direct Msg button in the footer
 - you can do a general search in twitter using the search box.
 - this program will autorefresh your home_timeline (default 10 minutes).
 
 ToDo
 ===========
-- retweet
 - notify user of new tweets
 - better error handling
 
@@ -73,6 +75,8 @@ I was able to override jqm's CSS by using style="" in my html but it is trickier
 
 - I had a problem updating the html in headers and footers with data-position=fixed. I needed to change the visible buttons on my fixed footer depending on the page content. I tried to use the trick explained above to replace the html then running page(). 
 This worked for the most part except the fixed function stopped working.. Apparently jqm adds some additional handlers to fixed headers/footers to dynamically adjust their position on the page depending on the current scroll position. But these handlers weren't being reinstalled after i ran page() on the updated html.  
+
+- I designed my own dialog functionality instead of using JQM's since JQM's was designed to work with AJAX or externally linked pages instead of pages that were created by javascript. My solution work's pretty well but i am sure that it's look and feel (css) will break down on untested devices. That is where JQM really shines!
 
 - Overall, jqm worked very well. My application doesn't use standard ajax or linked pages so i guess that i was stretching the limits of the current alpha jqm.
 
