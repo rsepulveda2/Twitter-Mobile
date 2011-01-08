@@ -23,6 +23,9 @@
   .ui-li-thumb, .ui-li-icon { top: 13px; }
   
   .ui-input-search { width: 40% !important;}
+  
+  .ui-btn-icon-right .ui-icon { position: absolute; top: 20%; margin-top: -9px; }
+  
 </style>
 
 <script type="text/javascript">
@@ -123,7 +126,7 @@
               alert( "failWhale(e);"); //					failWhale(json.error);
               return;
             }
-
+          
             twttr.anywhere(function (T) {    
               updateStatusPage(T, json.results, current);
             });
@@ -301,7 +304,7 @@
       if( status.user)
       {
         str += 
-        "<li class='tweet-li'>"+
+        "<li class='tweet-li' data-tweet-id='" + status.idStr + "'>"+
         "   <img src='" + status.user.profileImageUrl + "' />"+
         "   <h4><a href='#' class='status_reply' status_id='@" + status.user.screenName + "'>" + 
               status.user.name + "<span style='font-weight:normal;'>&nbsp;&nbsp;(" + createdAt + ")</span>" +
@@ -312,7 +315,7 @@
       else
       {
         str += 
-        "<li class='tweet-li'>"+
+        "<li class='tweet-li' data-tweet-id='" + status.idStr + "'>"+
         "   <img src='" + status.profile_image_url + "' />"+
         "   <h4><a href='#' class='status_reply' status_id=''>" +
               status.from_user + "<span style='font-weight:normal;'>&nbsp;&nbsp;(" + createdAt + ")</span>"+
@@ -420,8 +423,10 @@
         twttr.anywhere(function (T) {
           T.DirectMessage.send(id, msg, {success: function(){
               alert("Message successfully sent to " + id);
+              backButton();              
             }, error:function(){ 
               alert("Error sending message to " + id); 
+              backButton();              
             }});
           });
           
@@ -439,8 +444,10 @@
         twttr.anywhere(function (T) {
           T.Status.reply( 0, msg, {success: function(){
               alert("Message successfully sent to " + id);
+              backButton();              
             }, error:function(){ 
               alert("Error sending message to " + id); 
+              backButton();              
             }});
           });
           
@@ -464,8 +471,10 @@
         twttr.anywhere(function (T) {
           T.Status.update( msg, {success: function(){
               alert("Tweet successfully sent");
+              backButton();
             }, error:function(){ 
               alert("Error sending tweet"); 
+              backButton();              
             }});
           });
           
@@ -524,8 +533,8 @@
     });
     
     // button at the right of tweet (reply to tweet)
-    $(stitle + " span.ui-icon").unbind();
-    $(stitle + " span.ui-icon").click( function(){
+    $(stitle + " span.ui-icon-arrow-r").unbind();
+    $(stitle + " span..ui-icon-arrow-r").click( function(){
     
       // find the owner of this tweet (stored in the $("a.status_reply) tag in attribute "status_id"
       var id = $(this).siblings().find("a.status_reply").attr("status_id");
@@ -535,8 +544,10 @@
       twttr.anywhere(function (T) {
         T.Status.reply( 0, msg, {success: function(){
             alert("Message successfully sent to " + id);
+            backButton();                          
           }, error:function(){ 
             alert("Error sending message to " + id); 
+            backButton();                          
           }});
         });
         
