@@ -22,7 +22,7 @@
   .ui-li-desc {  margin: -.5em 0 .6em; text-overflow: ellipsis; overflow: visible; white-space: pre-line; }
   .ui-li-thumb, .ui-li-icon { top: 13px; }
   
-  .ui-input-search { width: 40% !important;}
+  .ui-input-search { width: 50% !important;}
   
   .ui-btn-icon-right .ui-icon { position: absolute; top: 30%; margin-top: -9px; }
   
@@ -103,7 +103,7 @@
     }
     else if( current[0] == '@'){  // grab specified user's tweets
       twttr.anywhere(function (T) {  
-        T.User.find(current.substr(1,current.length - 1)).timeline({count:50, success:function(statuses){
+        T.User.find( encodeURIComponent(current.substr(1,current.length - 1))).timeline({count:50, success:function(statuses){
           $.mobile.pageLoading(true);        
           updateStatusPage(T, statuses.array, current);
         }});
@@ -185,7 +185,7 @@
     // set title of message page
     $('.tweetTitle').html(title);
     
-    $('.tweetText').attr("value", (msg==undefined)?"":msg);
+    $('.tweetText').attr("value", msg||"");
 
     // display the page
     phistory[phistory.length] = "message_page";                      
@@ -199,7 +199,25 @@
         alert( "You can't send an empty message");
         return false;
       }
+      
+      // this is a poor guess of max message length. i could be more accurate by actually searching the
+      // message for an http: regexp pattern's and replacing that length with a shortened url length such 
+      // as http://t.co/KU7nTOX which is 19 characters versus the actual html address length
+      
+      if( msg.length >= 340){
+        alert( "Your message exceeded 340 characters. The twitter limit is 240 characters but " + 
+        "your html links may be shortened. Please reduce your message length.");
+        return false;
+      }
+      
+      // i haven't found a list of valid characters that twitter accepts, but this type of regexp can be 
+      // used to filter bad characters
+      
+      // msg = msg.replace (/[^0-9A-Z\s\-\'\"]/gi,"");   // "'   
   
+      // in terms of escaping dangerous database characters, i am going to assume that twitter.com will 
+      // escape any data that they are storing in their databases.      
+      
       callback(id,msg);
 
       return false;
@@ -212,7 +230,7 @@
     twttr.anywhere(function (T) {
   
       // the only way that i have found to get User data is to look in the tweet data that the user has sent
-      T.User.find(user.substr(1,user.length - 1)).timeline({ success:function(statuses){
+      T.User.find( encodeURIComponent(user.substr(1,user.length - 1))).timeline({ success:function(statuses){
       
         var userData=statuses.array[0].user; // just get the user's first tweet and extract the User structure
         
@@ -253,11 +271,14 @@
     {
       var status = statuses[i];
       
+      // convert any characters that may be confused as being html to their html escaped equivalents
+      status.text = htmlEntities(status.text);
+      
       // we find all linkable items in the tweet, http:, @user, #subject and embed them in <span> tags
-      // we install the real handlers for these a-tags later
-      var text = status.text.replace(/(http:\/\/[^\s]+)/g, "<span class='atag' href='$&'></span>");
+      // we install the real handlers for these a-tags later                 
+      var text = status.text.replace(/(http[s]?:\/\/[a-zA-Z0-9\.\-\_\/\?\%\#\&\=]+)/g, "<span class='atag' href='$&'></span>");
       var text = text.replace(/(#[^:\s]+)/g, "<span class='btag' href='$&'></span>");
-      var text = text.replace(/(@[^:\s]+)/g, "<span class='btag' href='$&'></span>");
+      var text = text.replace(/(@[a-zA-Z0-9\_]+)/g, "<span class='btag' href='$&'></span>");
 
       // calculate the age of the tweet
       if( status.createdAt)
@@ -371,9 +392,9 @@
       // workaround for strange bug cloning a page with search included
       $( stitle + ' .content').prepend(
   '    <form action="#" class="searchForm">'+
-  '      <div data-role="fieldcontain" style="padding:0; margin:0 0 25px 0;">'+
+  '      <div data-role="fieldcontain" style="padding:0; margin:0 0 20px 0;">'+
 //'        <label for="search">Search:</label>'+
-  '        <input type="search" name="search" class="search" value="" />'+
+  '        <input type="search" name="search" class="search" value="" style="font-size:13px" />'+
   '      </div>'+
   '    </form>');
       $( stitle + ' .searchForm').page();
@@ -421,7 +442,7 @@
         sendMessage("Direct Message to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
           
         twttr.anywhere(function (T) {
-          T.DirectMessage.send(id, msg, {success: function(){
+          T.DirectMessage.send( encodeURIComponent(id), encodeURIComponent(msg), {success: function(){
               alert("Message successfully sent to " + id);
               backButton();              
             }, error:function(){ 
@@ -442,7 +463,7 @@
         sendMessage("Reply to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
           
         twttr.anywhere(function (T) {
-          T.Status.reply( 0, msg, {success: function(){
+          T.Status.reply( 0, encodeURIComponent(msg), {success: function(){
               alert("Message successfully sent to " + id);
               backButton();              
             }, error:function(){ 
@@ -469,7 +490,7 @@
         sendMessage("Send tweet", $(this).attr("status_id"), function(id,msg){
           
         twttr.anywhere(function (T) {
-          T.Status.update( msg, {success: function(){
+          T.Status.update( encodeURIComponent(msg), {success: function(){
               alert("Tweet successfully sent");
               backButton();
             }, error:function(){ 
@@ -561,7 +582,7 @@
       sendMessage("Reply to " + id, id, function(id,msg){
         
       twttr.anywhere(function (T) {
-        T.Status.reply( 0, msg, {success: function(){
+        T.Status.reply( 0, encodeURIComponent(msg), {success: function(){
             alert("Message successfully sent to " + id);
             backButton();                          
           }, error:function(){ 
@@ -661,25 +682,33 @@
     $("#dialog_page div.dialog-title").html(dialogTitle||"");
     $("#dialog_page div.dialog-description").html(dialogDescription||"");
     
-	// add the buttons to the page
+    // add the buttons to the page
     $("#dialog_page div.dialog-buttons").html("");
     for( i=0; i<buttonTitles.length; ++i){
       $("#dialog_page div.dialog-buttons").append("<button class='dialog_button' style='width:100%%; height: 44px; " + 
       " background:white; border-radius: 10px; font-size:110%%; margin-bottom: 10px;' href='#' name='" + i + "'>" + buttonTitles[i] + "</button><br />");
     }
     
-	// setup a handler to catch button click events
+    // setup a handler to catch button click events
     $("#dialog_page .dialog_button").click( function(){
-
       backButton();									// pop the dialog from the screen
       callback( $(this).attr("name"), data);		// call the user's callback with button pressed and private data
       return false;
-	});
+    });
 
-	// this just pushes the dialog to the screen
-	phistory[phistory.length] = "dialog_page";                      
+    // this just pushes the dialog to the screen
+    phistory[phistory.length] = "dialog_page";                      
    	$.mobile.changePage($("#dialog_page"));              
   }
+  
+  // replace any html delimiters with their html escaped equivalents
+  function htmlEntities(str) 
+  {
+//    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); //"
+
+    // removed '&' since that may interfere with capturing a URL and wrapping it with <a> tags.
+    return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); //"
+  }  
     
 </script>
   
@@ -710,7 +739,7 @@
     <span class="follow-twitterapi"></span>
   </div>
 
-  <div class="content" data-role="content" style="">  
+  <div class="content" data-role="content" style="padding:5px 20px 20px 20px;">  
     <div class="tweets"></div>    
   </div>
   
