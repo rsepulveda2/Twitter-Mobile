@@ -7,7 +7,7 @@
   
 	<title>Twitter-Mobile</title> 
 	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.0a2/jquery.mobile-1.0a2.min.css" />
-	<script src="http://code.jquery.com/jquery-1.4.4.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
   <script type="text/javascript" src="http://code.jquery.com/mobile/1.0a2/jquery.mobile-1.0a2.min.js"></script> 
   <script src="http://platform.twitter.com/anywhere.js?id=C4vv3E46DAprDT8m7pO0sw&v=1" type="text/javascript"></script>
 </head> 
@@ -91,6 +91,9 @@
   // display the specified tweet data (timeline, @user, #subject)
   function fetchPage(current)
   {
+    if( phistory[phistory.length - 1] == current) // don't launch the same page
+      return;
+  
     $.mobile.pageLoading();  // page loading animation
     
     if( current == "Timeline"){   // user's home timeline
@@ -117,13 +120,13 @@
           timeout: 30000,
           data: {rpp:50},          
           error: function(xhr, status, e) {
-            alert( "failWhale(e);");
+            alert( "An error occurred while fetching search results");
           },
           success: function(json) {
             $.mobile.pageLoading(true);
           
             if (json.error) {
-              alert( "failWhale(e);"); //					failWhale(json.error);
+              alert( "An error occurred while fetching search results");
               return;
             }
           
@@ -207,6 +210,7 @@
       if( msg.length >= 340){
         alert( "Your message exceeded 340 characters. The twitter limit is 240 characters but " + 
         "your html links may be shortened. Please reduce your message length.");
+        
         return false;
       }
       
@@ -277,14 +281,11 @@
       // we find all linkable items in the tweet, http:, @user, #subject and embed them in <span> tags
       // we install the real handlers for these a-tags later                 
       var text = status.text.replace(/(http[s]?:\/\/[a-zA-Z0-9\.\-\_\/\?\%\#\&\=]+)/g, "<span class='atag' href='$&'></span>");
-      var text = text.replace(/(#[^:\s]+)/g, "<span class='btag' href='$&'></span>");
-      var text = text.replace(/(@[a-zA-Z0-9\_]+)/g, "<span class='btag' href='$&'></span>");
+      text = text.replace(/(#[^:\s]+)/g, "<span class='btag' href='$&'></span>");
+      text = text.replace(/(@[a-zA-Z0-9\_]+)/g, "<span class='btag' href='$&'></span>");
 
       // calculate the age of the tweet
-      if( status.createdAt)
-        var createdAt = status.createdAt;
-      else
-        var createdAt = status.created_at;
+      var createdAt = status.createdAt || status.created_at;
 
       var createdDate = new Date(createdAt);
       
@@ -302,22 +303,13 @@
       var days=Math.floor(diff);            
       
       if( hours <= 0){
-        if( minutes == 1)
-          createdAt = minutes + " minute ago";
-        else
-          createdAt = minutes + " minutes ago";              
+        createdAt = minutes + ((minutes == 1)?" minute ago":" minutes ago");
       } 
       else if( hours < 24) { 
-        if( hours == 1)
-          createdAt = hours + " hour ago";
-        else
-          createdAt = hours + " hours ago";              
+        createdAt = hours + ((hours == 1)?" hour ago":" hours ago");
       }
       else {
-        if( days == 1)
-          createAt = days + " day ago";
-        else
-          createAt = days + " days ago";                            
+        createdAt = days + ((days == 1)?" day ago":" days ago");
       }
       
       // build the li for this tweet
@@ -355,7 +347,7 @@
       rtitle = "@" + screenName + " Timeline";      
     }
 
-    // build the id for this jquery mobile 'page' (we can't use @ or # in name so we change the name)
+    // build the page 'id' for this jquery mobile 'page' (we can't use @ or # in the name so we change the name)
     var newtitle = title;
     if( title[0] == '@')
       newtitle = "AT_" + title.substr( 1, title.length - 1);
@@ -365,7 +357,7 @@
     // build the jquery selector for this 'page'
     var stitle = '#' + newtitle;
     
-    // is this page already in the DOM? If not, we clone the template and modify it
+    // is this page already in the DOM? If not, we clone the template then modify it
     if( $(stitle).length <= 0)
     {
       var $clone = $("#default_page").clone();
@@ -374,14 +366,14 @@
       
       $("#anywhere").after($clone); // put the clone in the DOM
       
-      // set some internal data for the 'page'
+      // store some internal data for the 'page'
       jQuery.data( $(stitle)[0], "page_data", { title: title, id: stitle });
     
-      // set the page title and back button visible
+      // set the page title and back button visible attribute
       $( stitle + ' .rtitle').html(rtitle);    
       $( stitle + ' .myheader').attr( 'data-nobackbtn', (phistory.length<=1)?'true':'false');
      
-      // if this page is for a @user, we display the twitter follow user button
+      // if this page is for an @user, we display the twitter follow user button
       if( title[0] == '@'){   
         twttr.anywhere(function (T) { 
           $(stitle + " .follow-twitterapi").html("");
@@ -397,12 +389,12 @@
   '        <input type="search" name="search" class="search" value="" style="font-size:13px" />'+
   '      </div>'+
   '    </form>');
-      $( stitle + ' .searchForm').page();
+      $( stitle + ' .searchForm').page(); // tell jQueryMobile to compile this block of HTML
       
       // setup the buttons on the footer
       $(stitle + " .action-buttons").attr("status_id", title);
       
-      // we hide the reply button, direct message button and profile button on Home page and #subject pages
+      // we hide the reply button, direct message button and profile button on the Home page and #subject pages
       if( title[0] == '#' || title == 'Timeline'){
         var selector = stitle + " a.publicReplyButton," + stitle + " a.directMsgButton," + stitle + " a.profileButton";
         $(selector).css("visibility","hidden");
@@ -420,11 +412,11 @@
           timeout: 30000,
           data: {rpp:50},
           error: function(xhr, status, e) {
-            alert( "failWhale(e);");
+            alert( "An error occurred while fetching search results");
           },
           success: function(json) {
             if (json.error) {
-              alert( "failWhale(e);"); // failWhale(json.error);
+              alert( "An error occurred while fetching search results");
               return;
             }
 
@@ -437,13 +429,13 @@
         return false;
       });
       
-      // send a direct message to @user callback
+      // the direct message to @user callback
       $(stitle + " .directMsgButton").click( function(){
         sendMessage("Direct Message to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
           
         twttr.anywhere(function (T) {
           T.DirectMessage.send( encodeURIComponent(id), encodeURIComponent(msg), {success: function(){
-              alert("Message successfully sent to " + id);
+//              alert("Message successfully sent to " + id);
               backButton();              
             }, error:function(){ 
               alert("Error sending message to " + id); 
@@ -457,14 +449,14 @@
         return false;
       });
       
-      // send a public reply to @user callback      
+      // the public reply to @user callback      
       $(stitle + " .publicReplyButton").click( function(){
 
         sendMessage("Reply to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
           
         twttr.anywhere(function (T) {
           T.Status.reply( 0, encodeURIComponent(msg), {success: function(){
-              alert("Message successfully sent to " + id);
+//              alert("Message successfully sent to " + id);
               backButton();              
             }, error:function(){ 
               alert("Error sending message to " + id); 
@@ -478,20 +470,20 @@
         return false;
       });
       
-      // display user's profile callback
+      // the user's profile callback
       $(stitle + " .profileButton").click( function(){
         profile($(this).attr("status_id"));      
         return false;
       });
       
-      // send a tweet button callback
+      // the tweet button callback
       $(stitle + " .sendTweetButton").click( function(){
 
         sendMessage("Send tweet", $(this).attr("status_id"), function(id,msg){
           
         twttr.anywhere(function (T) {
           T.Status.update( encodeURIComponent(msg), {success: function(){
-              alert("Tweet successfully sent");
+//              alert("Tweet successfully sent");
               backButton();
             }, error:function(){ 
               alert("Error sending tweet"); 
@@ -583,7 +575,7 @@
         
       twttr.anywhere(function (T) {
         T.Status.reply( 0, encodeURIComponent(msg), {success: function(){
-            alert("Message successfully sent to " + id);
+//            alert("Message successfully sent to " + id);
             backButton();                          
           }, error:function(){ 
             alert("Error sending message to " + id); 
