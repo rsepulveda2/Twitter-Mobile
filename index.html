@@ -67,14 +67,11 @@
   function backButton()
   {
     // we pop the top page unless we are already on the bottom
-    current = phistory[0];
-    if( phistory.length > 1)
-    {
-      phistory.length = phistory.length - 1;
-      current = phistory[phistory.length - 1];
-    }
-    else
+    if( phistory.length == 1)
       return;
+      
+    phistory.length = phistory.length - 1;
+    current = phistory[phistory.length - 1];
     
     // now tell jquerymobile to display the top-of-stack page
     var newtitle = title = current;
@@ -88,7 +85,7 @@
     $.mobile.changePage($(stitle));          
   }
     
-  // display the specified tweet data (timeline, @user, #subject)
+  // display the specified tweet data (timeline, @user, #subject) 
   function fetchPage(current)
   {
     if( phistory[phistory.length - 1] == current) // don't launch the same page
@@ -182,19 +179,20 @@
     }
   };  
   
-  // this is called when we want to send any kind of message( tweet, reply, direct message)
+  // this is called when we want to send a message( tweet, reply, direct message)
   function sendMessage(title,id,callback,msg)
   {  
     // set title of message page
     $('.tweetTitle').html(title);
     
+    // set the textarea element if specified in 'msg'
     $('.tweetText').attr("value", msg||"");
 
     // display the page
     phistory[phistory.length] = "message_page";                      
     $.mobile.changePage($('#message_page'));   
   
-    // if user presses send, we grab the message and call the callback to complete the send
+    // if the user presses send, we grab the message and call the callback to complete the send
     $('.sendButton').click( function(){
       msg = $(".tweetText").attr("value");
       
@@ -204,8 +202,8 @@
       }
       
       // this is a poor guess of max message length. i could be more accurate by actually searching the
-      // message for an http: regexp pattern's and replacing that length with a shortened url length such 
-      // as http://t.co/KU7nTOX which is 19 characters versus the actual html address length
+      // message for http: regexp pattern's and replacing that length with a shortened url length such 
+      // as http://t.co/KU7nTOX (19 characters)
       
       if( msg.length >= 340){
         alert( "Your message exceeded 340 characters. The twitter limit is 240 characters but " + 
@@ -511,7 +509,7 @@
     $( stitle + " ul").page();  // now get jquerymobile to add its special markup to our markup
   
     // install retweet button for each tweet
-    $(stitle + " span.ui-icon").before('<span style="right:10px; top:70%%;" class="ui-icon ui-icon-refresh"></span>');
+    $(stitle + " span.ui-icon-arrow-r").before('<span style="right:10px; top:70%%;" class="ui-icon ui-icon-refresh"></span>');
     $(stitle + " span.ui-icon-refresh").unbind();
     $(stitle + " span.ui-icon-refresh").click( function(){
       var id = $(this).closest("li.tweet-li").attr("data-tweet-id");  // get this tweet's id
@@ -553,17 +551,18 @@
       return false;
     });       
     
-    // user pressed the thumbnail or title   
-    $(stitle + " a.status_reply").unbind();
-    $(stitle + " a.status_reply").click( function(){
+    // user pressed the thumbnail
+    $(stitle + " p," + stitle + " img," + stitle + " a.status_reply").unbind();
+    $(stitle + " p," + stitle + " a.status_reply").click( function(){ return false});
 
-      href = $(this).attr("status_id");
+    $(stitle + " img").click( function(){ 
+      var href = $(this).siblings().find("a.status_reply").attr("status_id");
       
       fetchPage( href); // display the page associated with this @user or #subject
       
       return false;   
     });
-    
+        
     // button at the right of tweet (reply to tweet)
     $(stitle + " span.ui-icon-arrow-r").unbind();
     $(stitle + " span..ui-icon-arrow-r").click( function(){
@@ -722,7 +721,7 @@
 <div id="default_page" data-role="page" class="foo">
     
   <div class="myheader" data-role="header" data-position="fixed" data-nobackbtn="true">
-    <a class="back-btn" href="#" data-icon="arrow-l" onclick="backButton();">Back</a>  
+    <a class="back-btn" href="#" data-icon="arrow-l" onclick="backButton();">Back</a>
     
     <h1 class="rtitle"></h1>
 
