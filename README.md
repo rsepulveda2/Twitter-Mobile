@@ -30,6 +30,7 @@ option in Mobile Safari. Then launch the app from your home page.
 button. When you press it, it will redirect you to twitter.com to login. After login, twitter will redirect
 you back to the webpage.
 - this app will grab your home timeline from twitter and display it on the screen
+- display logged in user's direct messages by pressing the Direct Msg button on the home timeline
 - click on @user's to bring up their tweets, click on #subject's to search twitter for that keyword.
 - send a general tweet to the world by pressing the Tweet button in the header
 - reply to a user's tweet by pressing the right arrow button on the top right of each tweet

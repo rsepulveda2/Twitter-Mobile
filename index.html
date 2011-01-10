@@ -275,6 +275,19 @@
     if( displayPage == undefined) // do we also want to display the page after it is built?
       displayPage = true;
       
+    var TimelineMode = 0;
+    var UserMode = 1;
+    var SearchMode = 2;
+    var DMMode = 3;
+  
+    var mode = TimelineMode;
+    if( title == 'DirectMessages')
+      mode = DMMode;
+    else if( title[0] == '@')
+      mode = UserMode;
+    else if( title[0] == '#')
+      mode = SearchMode;
+      
     // build the ul/li markup for the statuses(tweets)
     var str = "";
     str += '<ul data-role="listview">';
@@ -322,7 +335,20 @@
       
       // build the li for this tweet
       // we look at different 'status' structure names depending on the where we got the statuses
-      if( status.user)
+      if( status.sender){
+        str +=
+        "<li class='tweet-li' data-tweet-id='" + status.idStr + "'>"+
+        "   <img src='" + status.sender.profileImageUrl + "' />"+
+        "   <h4><a href='#' class='status_reply' status_id='@" + status.sender.screenName + "'>" + 
+        status.sender.screenName + " -> " + status.recipientScreenName + 
+        "<span style='font-weight:normal;font-size:90%;'>&nbsp;&nbsp;<br />(" + 
+              (createdDate.getMonth() + 1) + "/" + createdDate.getDate() + "/" + createdDate.getFullYear() + " " + 
+              createdDate.getHours() + ":" + createdDate.getMinutes() + ")</span>" +
+        "   </a></h4>"+
+        "   <p>" + text + "</p>"+
+        "</li>";      
+      }
+      else if( status.user)
       {
         str += 
         "<li class='tweet-li' data-tweet-id='" + status.idStr + "'>"+
@@ -417,9 +443,9 @@
       // setup the buttons on the footer
       $(stitle + " .action-buttons").attr("status_id", title);
       
-      // we hide the reply button, direct message button and profile button on the Home page and #subject pages
-      if( title[0] == '#' || title == 'Timeline'){
-        var selector = stitle + " a.publicReplyButton," + stitle + " a.directMsgButton," + stitle + " a.profileButton";
+      // we hide the reply button and profile button except on User pages
+      if( mode != UserMode){
+        var selector = stitle + " a.publicReplyButton," + stitle + " a.profileButton";
         $(selector).css("visibility","hidden");
       }
 
@@ -454,22 +480,54 @@
       
       // the direct message to @user callback
       $(stitle + " .directMsgButton").click( function(){
-        sendMessage("Direct Message to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
+      
+        if( title == 'DirectMessages')
+          return;
           
-        twttr.anywhere(function (T) {
-          T.DirectMessage.send( encodeURIComponent(id), encodeURIComponent(msg), {success: function(){
-//              alert("Message successfully sent to " + id);
-              backButton();              
-            }, error:function(){ 
-              alert("Error sending message to " + id); 
-              backButton();              
+        if( title == 'Timeline'){      // Display all direct messages sent to and from current user
+
+          twttr.anywhere(function (T) {
+            T.User.current().directMessages( {count:50, success:function(receiveDMs){            
+              T.User.current().sentMessages( {count:50, success:function(sentDMs){
+                var myReceiveDMs = receiveDMs.array;
+                var newArray = myReceiveDMs.concat(sentDMs.array);
+                
+                var nowDate = new Date();      
+                newArray.sort( function (a,b) {
+                  var createdDateA = new Date(a.createdAt);
+                  var createdDateB = new Date(b.createdAt);
+                  
+                  var diffA = nowDate - createdDateA;
+                  var diffB = nowDate - createdDateB;                
+                  
+                  return diffA - diffB;
+                });
+                
+                updateStatusPage(T, newArray, "DirectMessages");            
+              }});            
             }});
           });
           
+          return false;                  
+        }
+        else {		// send a Direct message to this user
+
+          sendMessage("Direct Message to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
+            
+          twttr.anywhere(function (T) {
+            T.DirectMessage.send( id.substr(1,id.length - 1), msg, {success: function(){
+                backButton();              
+              }, error:function(){ 
+                alert("Error sending message to " + id); 
+                backButton();              
+              }});
+            });
+            
+            return false;
+          });
+          
           return false;
-        });
-        
-        return false;
+        }
       });
       
       // the public reply to @user callback      
@@ -478,8 +536,7 @@
         sendMessage("Reply to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
           
         twttr.anywhere(function (T) {
-          T.Status.reply( 0, encodeURIComponent(msg), {success: function(){
-//              alert("Message successfully sent to " + id);
+          T.Status.reply( 0, msg, {success: function(){
               backButton();              
             }, error:function(){ 
               alert("Error sending message to " + id); 
@@ -505,8 +562,7 @@
         sendMessage("Send tweet", $(this).attr("status_id"), function(id,msg){
           
         twttr.anywhere(function (T) {
-          T.Status.update( encodeURIComponent(msg), {success: function(){
-//              alert("Tweet successfully sent");
+          T.Status.update( msg, {success: function(){
               backButton();
             }, error:function(){ 
               alert("Error sending tweet"); 
@@ -533,24 +589,27 @@
     
     $( stitle + " ul").page();  // now get jquerymobile to add its special markup to our markup
   
-    // install retweet button for each tweet
-    $(stitle + " span.ui-icon-arrow-r").before('<span style="right:10px; top:70%%;" class="ui-icon ui-icon-refresh"></span>');
-    $(stitle + " span.ui-icon-refresh").unbind();
-    $(stitle + " span.ui-icon-refresh").click( function(){
-      var id = $(this).closest("li.tweet-li").attr("data-tweet-id");  // get this tweet's id
-      
-      displayDialog( "Retweet", "Alert", "Are you sure that you want to send this retweet?", ["Yes","No"], id,
-        function(buttonIndex,id){
-          if( buttonIndex == '0'){  // send retweet
-            twttr.anywhere(function (T) {
-              T.Status.retweet(id);
-            });                          
-          } else {  // cancel retweet
-          }
-        });      
-      
-      return false;
-    });
+    if( mode != DMMode){
+
+      // install retweet button for each tweet
+      $(stitle + " span.ui-icon-arrow-r").before('<span style="right:10px; top:70%%;" class="ui-icon ui-icon-refresh"></span>');
+      $(stitle + " span.ui-icon-refresh").unbind();
+      $(stitle + " span.ui-icon-refresh").click( function(){
+        var id = $(this).closest("li.tweet-li").attr("data-tweet-id");  // get this tweet's id
+        
+        displayDialog( "Retweet", "Alert", "Are you sure that you want to send this retweet?", ["Yes","No"], id,
+          function(buttonIndex,id){
+            if( buttonIndex == '0'){  // send retweet
+              twttr.anywhere(function (T) {
+                T.Status.retweet(id);
+              });                          
+            } else {  // cancel retweet
+            }
+          });      
+        
+        return false;
+      });
+    }
 
     // convert the embedded span tags into <a> tags. we did this because jqm manipulates <a> tags in unwanted ways
     $(stitle + " span.atag").each( function(){
@@ -577,7 +636,8 @@
     $(stitle + " img").click( function(){ 
       var href = $(this).siblings().find("a.status_reply").attr("status_id");
       
-      fetchPage( href); // display the page associated with this @user or #subject
+      if( href != ('@' + myCurrentUser.data('screen_name')))
+        fetchPage( href); // display the page associated with this @user or #subject
       
       return false;   
     });
@@ -589,22 +649,45 @@
       // find the owner of this tweet (stored in the $("a.status_reply) tag in attribute "status_id"
       var id = $(this).siblings().find("a.status_reply").attr("status_id");
       
-      sendMessage("Reply to " + id, id, function(id,msg){
-        
-      twttr.anywhere(function (T) {
-        T.Status.reply( 0, encodeURIComponent(msg), {success: function(){
-//            alert("Message successfully sent to " + id);
-            backButton();                          
-          }, error:function(){ 
-            alert("Error sending message to " + id); 
-            backButton();                          
-          }});
+      if( mode == DMMode){
+      
+        if( id == ('@' + myCurrentUser.data('screen_name'))) // can't send a DM to yourself
+          return false;
+          
+        sendMessage("Direct Message to " + id, id, function(id,msg){
+          
+        twttr.anywhere(function (T) {
+          T.DirectMessage.send( id.substr(1,id.length - 1), msg, {success: function(){
+              backButton();              
+            }, error:function(){ 
+              alert("Error sending message to " + id); 
+              backButton();              
+            }});
+          });
+          
+          return false;
         });
         
-        return false;
-      }, id + " ");
+        return false;      
+      }
+      else {
       
-      return false;
+        sendMessage("Reply to " + id, id, function(id,msg){
+          
+        twttr.anywhere(function (T) {
+          T.Status.reply( 0, msg, {success: function(){
+              backButton();                          
+            }, error:function(){ 
+              alert("Error sending message to " + id); 
+              backButton();                          
+            }});
+          });
+          
+          return false;
+        }, id + " ");
+        
+        return false;
+      }
     });
     
     // if we want to display the page, we push our hash history and tell jqm to change the page
@@ -770,8 +853,8 @@
   
   <div class="footer" data-role="footer" data-position="fixed" >
     <a href="#" data-role="button" class="logoutButton">Logout</a>    
-    <a href="#" data-role="button" class="action-buttons publicReplyButton" status_id="">Reply</a>
     <a href="#" data-role="button" class="action-buttons directMsgButton" status_id="">Direct Msg</a>
+    <a href="#" data-role="button" class="action-buttons publicReplyButton" status_id="">Reply</a>
     <a href="#" data-role="button" class="action-buttons profileButton" status_id="">Profile</a>
   </div>  
 </div>
@@ -823,8 +906,8 @@
   </div>
   <div class="footer" data-role="footer" data-position="fixed" >
     <a href="#" data-role="button" class="logoutButton">Logout</a>    
-    <a href="#" data-role="button" class="action-buttons publicReplyButton" status_id="">Reply</a>
     <a href="#" data-role="button" class="action-buttons directMsgButton" status_id="">Direct Msg</a>
+    <a href="#" data-role="button" class="action-buttons publicReplyButton" status_id="">Reply</a>
   </div>  
 </div>
 
