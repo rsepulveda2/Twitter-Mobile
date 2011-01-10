@@ -3,11 +3,21 @@
 
 <html> 
 <head> 
-	<meta charset="utf-8" /> 
+  <meta charset="utf-8" /> 
+
+  <title>Twitter-Mobile</title> 
+
+  <link rel="stylesheet" href="http://code.jquery.com/mobile/1.0a2/jquery.mobile-1.0a2.min.css" />
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
   
-	<title>Twitter-Mobile</title> 
-	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.0a2/jquery.mobile-1.0a2.min.css" />
-	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
+  <script type="text/javascript" >
+    // make app zoomable
+    $(document).bind("mobileinit", function(){
+      $.mobile.metaViewportContent = "width=device-width, minimum-scale=1, maximum-scale=2";
+    });
+  </script>
+  
   <script type="text/javascript" src="http://code.jquery.com/mobile/1.0a2/jquery.mobile-1.0a2.min.js"></script> 
   <script src="http://platform.twitter.com/anywhere.js?id=C4vv3E46DAprDT8m7pO0sw&v=1" type="text/javascript"></script>
 </head> 
@@ -91,7 +101,7 @@
     if( phistory[phistory.length - 1] == current) // don't launch the same page
       return;
   
-    $.mobile.pageLoading();  // page loading animation
+    displayPageLoadingIndicator();  // page loading animation
     
     if( current == "Timeline"){   // user's home timeline
       twttr.anywhere(function (T) {    
@@ -110,28 +120,28 @@
       });
     }
     else if( current[0] == '#'){ // grab tweets containing specified string
-        var url = 'http://search.twitter.com/search.json?q=' + encodeURIComponent(current);
+      var url = 'http://search.twitter.com/search.json?q=' + encodeURIComponent(current);
+      
+      $.getJSONP({
+        url:url,
+        timeout: 30000,
+        data: {rpp:50},          
+        error: function(xhr, status, e) {
+          alert( "An error occurred while fetching search results");
+        },
+        success: function(json) {
+          $.mobile.pageLoading(true);
         
-        $.getJSONP({
-          url:url,
-          timeout: 30000,
-          data: {rpp:50},          
-          error: function(xhr, status, e) {
+          if (json.error) {
             alert( "An error occurred while fetching search results");
-          },
-          success: function(json) {
-            $.mobile.pageLoading(true);
-          
-            if (json.error) {
-              alert( "An error occurred while fetching search results");
-              return;
-            }
-          
-            twttr.anywhere(function (T) {    
-              updateStatusPage(T, json.results, current);
-            });
+            return;
           }
-        });
+        
+          twttr.anywhere(function (T) {    
+            updateStatusPage(T, json.results, current);
+          });
+        }
+      });
     }
     
     return false;
@@ -366,6 +376,21 @@
       
       // store some internal data for the 'page'
       jQuery.data( $(stitle)[0], "page_data", { title: title, id: stitle });
+      
+      var pagesel = stitle;
+      
+      // this attempts to workaround a problem with JQM. I was sometimes getting strange
+      // behavior with the fixed header and footer. They would sometimes hang in the middle
+      // of the page or disappear altogether. After some digging in the JQM sources, I found 
+      // the $.fixedToolbars function that appears to control these. The show command will force 
+      // them to display, so i tied that to the window.scroll() event. One other problem popped up
+      // where the header was showing below the normal 'content'. The fixed header/footer are set
+      // to z-index:1000 in the JQM CSS but for some reason that seemed to change?? so i also force 
+      // the z-index to 1000.
+      $(window).scroll( function(){   
+        $(pagesel).find("[data-role=header],[data-role=footer]").css("z-index","1000");
+        $.fixedToolbars.show(true);
+      });
     
       // set the page title and back button visible attribute
       $( stitle + ' .rtitle').html(rtitle);    
@@ -497,8 +522,8 @@
             
       // logout button callback
       $(stitle + " .logoutButton").click( function(){          
-          twttr.anywhere.signOut();
-      return false;
+        twttr.anywhere.signOut();
+        return false;
       });              
     }
     
@@ -527,12 +552,6 @@
       return false;
     });
 
-    // if we want to display the page, we push our hash history and tell jqm to change the page
-    if( displayPage){
-      phistory[phistory.length] = title;                      
-      $.mobile.changePage(stitle); 
-    }
-  
     // convert the embedded span tags into <a> tags. we did this because jqm manipulates <a> tags in unwanted ways
     $(stitle + " span.atag").each( function(){
       $(this).after( "<a class='aref' href='" + $(this).attr("href") + "'>" + $(this).attr("href") + "</a>");      
@@ -588,6 +607,11 @@
       return false;
     });
     
+    // if we want to display the page, we push our hash history and tell jqm to change the page
+    if( displayPage){
+      phistory[phistory.length] = title;                      
+      $.mobile.changePage(stitle); 
+    }          
   }  // end updateStatusPage()
         
   // this is called on startup to see if we are already logged into twitter, if not, we display
@@ -647,7 +671,7 @@
   {
     if( $("#Timeline").length){
       twttr.anywhere(function (T) {  
-        $.mobile.pageLoading();       
+        displayPageLoadingIndicator();       
         T.User.current().homeTimeline({count:50, success:function(statuses){
           $.mobile.pageLoading(true);
           updateStatusPage(T, statuses.array, "Timeline", false);            
@@ -658,6 +682,16 @@
     setTimeout(function(){
       refreshTimeline()    
     }, autorefreshTime * 60 * 1000);       
+  }
+  
+  // display the page loading animation and automatically dismisses the indicator just in case
+  // the ajax call never completes (default timeout 10 seconds)
+  function displayPageLoadingIndicator()
+  {
+    $.mobile.pageLoading();
+    setTimeout(function(){
+      $.mobile.pageLoading(true);
+    }, 10 * 1000);           
   }
 
   // this routine displays a dialog with the given title's, description and button titles
