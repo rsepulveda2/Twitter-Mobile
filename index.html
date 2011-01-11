@@ -269,17 +269,17 @@
     });          
   }
     
+  var TimelineMode = 0;
+  var UserMode = 1;
+  var SearchMode = 2;
+  var DMMode = 3;
+  
   // this builds the tweet page (home timeline, @user, or #subject)
   function updateStatusPage(T, statuses, title, displayPage)
   {
     if( displayPage == undefined) // do we also want to display the page after it is built?
       displayPage = true;
       
-    var TimelineMode = 0;
-    var UserMode = 1;
-    var SearchMode = 2;
-    var DMMode = 3;
-  
     var mode = TimelineMode;
     if( title == 'DirectMessages')
       mode = DMMode;
@@ -288,6 +288,360 @@
     else if( title[0] == '#')
       mode = SearchMode;
       
+    // build the title for this page
+    var rtitle = title;
+    if( title == "Timeline"){
+      screenName = myCurrentUser.data('screen_name');
+      rtitle = "@" + screenName + " Timeline";      
+    }
+
+    // build the page 'id' for this jquery mobile 'page' (we can't use @ or # in the name so we change the name)
+    var newtitle = title;
+    if( title[0] == '@')
+      newtitle = "AT_" + title.substr( 1, title.length - 1);
+    if( title[0] == '#')
+      newtitle = "LB_" + title.substr( 1, title.length - 1);
+      
+    // build the jquery selector for this 'page'
+    var stitle = '#' + newtitle;
+    
+    // is this page already in the DOM? If not, we clone the template then modify it
+    if( $(stitle).length <= 0)
+    {
+      var $clone = $("#default_page").clone();
+      
+      $clone.attr("id",newtitle);   // set the id of the 'page'
+      
+      $("#anywhere").after($clone); // put the clone in the DOM
+      
+      // store some internal data for the 'page'
+      jQuery.data( $(stitle)[0], "page_data", { title: title, id: stitle });
+      
+      var pagesel = stitle;
+      
+      // this attempts to workaround a problem with JQM. I was sometimes getting strange
+      // behavior with the fixed header and footer. They would sometimes hang in the middle
+      // of the page or disappear altogether. After some digging in the JQM sources, I found 
+      // the $.fixedToolbars function that appears to control these. The show command will force 
+      // them to display, so i tied that to the window.scroll() event. One other problem popped up
+      // where the header was showing below the normal 'content'. The fixed header/footer are set
+      // to z-index:1000 in the JQM CSS but for some reason that seemed to change?? so i also force 
+      // the z-index to 1000.
+      $(window).scroll( function(){   
+        $(pagesel).find("[data-role=header],[data-role=footer]").css("z-index","1000");
+        $.fixedToolbars.show(true);
+      });
+    
+      // set the page title and back button visible attribute
+      $( stitle + ' .rtitle').html(rtitle);    
+      $( stitle + ' .myheader').attr( 'data-nobackbtn', (phistory.length<=1)?'true':'false');
+     
+      // if this page is for an @user, we display the twitter follow user button
+      if( title[0] == '@'){   
+        twttr.anywhere(function (T) { 
+          $(stitle + " .follow-twitterapi").html("");
+          T(stitle + " .follow-twitterapi").followButton(title.substr(1,title.length - 1));
+        });
+      }      
+      
+      // workaround for strange bug cloning a page with search included
+      $( stitle + ' .content').prepend(
+  '    <form action="#" class="searchForm">'+
+  '      <div data-role="fieldcontain" style="padding:0; margin:0 0 20px 0;">'+
+//'        <label for="search">Search:</label>'+
+  '        <input type="search" name="search" class="search" value="" style="font-size:13px" />'+
+  '      </div>'+
+  '    </form>');
+      $( stitle + ' .searchForm').page(); // tell jQueryMobile to compile this block of HTML
+      
+      // setup the buttons on the footer
+      $(stitle + " .action-buttons").attr("status_id", title);
+      
+      // we hide the reply button and profile button except on User pages
+      if( mode != UserMode){
+        var selector = stitle + " a.publicReplyButton," + stitle + " a.profileButton";
+        $(selector).css("visibility","hidden");
+      }
+      
+      // setup the search field callback
+      $(stitle + " .searchForm").submit( function(){
+      
+        // get the search string and call twitter search, then display the status results
+        var searchVal = $(stitle + " .search").attr("value");
+        var url = 'http://search.twitter.com/search.json?q=' + encodeURIComponent( searchVal);
+        
+        $.getJSONP({
+          url:url,
+          timeout: 30000,
+          data: {rpp:50},
+          error: function(xhr, status, e) {
+            alert( "An error occurred while fetching search results");
+          },
+          success: function(json) {
+            if (json.error) {
+              alert( "An error occurred while fetching search results");
+              return;
+            }
+
+           twttr.anywhere(function (T) {    
+              updateStatusPage(T, json.results, searchVal);            
+            });
+          }
+        });      
+        
+        return false;
+      });
+      
+      installButtonHandlers(stitle,title);
+    }
+    
+    var str = buildTweetTable( statuses);
+    
+    // clear out the tweet section of our page and insert the fresh data
+    $( stitle + ' .tweets').html("");
+    $( stitle + ' .tweets').append(str);
+    
+    $( stitle + " ul").page();  // now get jquerymobile to add its special markup to our html
+  
+    // install retweet button for each tweet
+    if( mode != DMMode){
+
+      $(stitle + " span.ui-icon-arrow-r").before('<span style="right:10px; top:70%%;" class="ui-icon ui-icon-refresh"></span>');
+      $(stitle + " span.ui-icon-refresh").unbind();
+      $(stitle + " span.ui-icon-refresh").click( function(){
+        var id = $(this).closest("li.tweet-li").attr("data-tweet-id");  // get this tweet's id
+        
+        displayDialog( "Retweet", "Alert", "Are you sure that you want to send this retweet?", ["Yes","No"], id,
+          function(buttonIndex,id){
+            if( buttonIndex == '0'){  // send retweet
+              twttr.anywhere(function (T) {
+                T.Status.retweet(id);
+              });                          
+            } else {  // cancel retweet
+            }
+          });      
+        
+        return false;
+      });
+    }
+
+    installLinkHandlers(stitle,mode);
+    
+    // if we want to display the page, we push our hash history and tell jqm to change the page
+    if( displayPage){
+      phistory[phistory.length] = title;                      
+      $.mobile.changePage(stitle); 
+    }          
+  }  // end updateStatusPage()
+  
+  // installs the handlers for the links in each tweet (thumbnail, @user, #subject, reply button, retweet button)
+  function installLinkHandlers(stitle,mode)
+  {
+    // convert the embedded span tags into <a> tags. we did this because jqm manipulates <a> tags in unwanted ways
+    $(stitle + " span.atag").each( function(){
+      $(this).after( "<a class='aref' href='" + $(this).attr("href") + "'>" + $(this).attr("href") + "</a>");      
+    });
+        
+    $(stitle + " span.btag").each( function(){
+      $(this).after( "<a class='bref' href='" + $(this).attr("href") + "'>" + $(this).attr("href") + "</a>");      
+    });    
+        
+    // user pressed a link embedded in the tweet
+    $(stitle + " a.aref").click( function(){
+      var href = $(this).attr("href");
+      
+      window.location = href;
+      
+      return false;
+    });    
+    
+    // user pressed a @user or #subject embedded in the tweet
+    $(stitle + " a.bref").click( function(){
+      var href = $(this).attr("href");
+      
+      fetchPage( href); // display the page associated with this @user or #subject
+      
+      return false;
+    });                 
+        
+    // user pressed the thumbnail
+    $(stitle + " p," + stitle + " img," + stitle + " a.status_reply").unbind();
+    $(stitle + " p," + stitle + " a.status_reply").click( function(){ return false});
+
+    $(stitle + " img").click( function(){ 
+      var href = $(this).siblings().find("a.status_reply").attr("status_id");
+      
+      if( href != ('@' + myCurrentUser.data('screen_name')))
+        fetchPage( href); // display the page associated with this @user or #subject
+      
+      return false;   
+    });
+    
+    // button at the right of tweet (reply to tweet)
+    $(stitle + " span.ui-icon-arrow-r").unbind();
+    $(stitle + " span..ui-icon-arrow-r").click( function(){
+    
+      // find the owner of this tweet (stored in the $("a.status_reply) tag in attribute "status_id"
+      var id = $(this).siblings().find("a.status_reply").attr("status_id");
+      
+      if( mode == DMMode){
+      
+        if( id == ('@' + myCurrentUser.data('screen_name'))) // can't send a DM to yourself
+          return false;
+          
+        sendMessage("Direct Message to " + id, id, function(id,msg){
+          
+        twttr.anywhere(function (T) {
+          T.DirectMessage.send( id.substr(1,id.length - 1), msg, {success: function(){
+              backButton();              
+            }, error:function(){ 
+              alert("Error sending message to " + id); 
+              backButton();              
+            }});
+          });
+          
+          return false;
+        });
+        
+        return false;      
+      }
+      else {
+      
+        sendMessage("Reply to " + id, id, function(id,msg){
+          
+        twttr.anywhere(function (T) {
+          T.Status.reply( 0, msg, {success: function(){
+              backButton();                          
+            }, error:function(){ 
+              alert("Error sending message to " + id); 
+              backButton();                          
+            }});
+          });
+          
+          return false;
+        }, id + " ");
+        
+        return false;
+      }
+    });  
+  }
+  
+  // installs the handlers for the buttons in the footer
+  function installButtonHandlers(stitle,title)
+  {
+    // the direct message to @user callback
+    $(stitle + " .directMsgButton").click( function(){
+    
+      if( title == 'DirectMessages')  // if we are already displaying direct messages, ignore this
+        return;
+        
+      if( title == 'Timeline'){      // Display all direct messages sent to and from current user
+
+        twttr.anywhere(function (T) {
+          displayPageLoadingIndicator();
+          
+          T.User.current().directMessages( {count:50, success:function(receiveDMs){            
+            T.User.current().sentMessages( {count:50, success:function(sentDMs){
+            
+              $.mobile.pageLoading(true);
+            
+              var myReceiveDMs = receiveDMs.array;
+              var newArray = myReceiveDMs.concat(sentDMs.array);
+              
+              var nowDate = new Date();      
+              newArray.sort( function (a,b) {
+                var createdDateA = new Date(a.createdAt);
+                var createdDateB = new Date(b.createdAt);
+                
+                var diffA = nowDate - createdDateA;
+                var diffB = nowDate - createdDateB;                
+                
+                return diffA - diffB;
+              });
+              
+              updateStatusPage(T, newArray, "DirectMessages");            
+            }});            
+          }});
+        });
+        
+        return false;                  
+      }
+      else {		// send a Direct message to this user
+
+        sendMessage("Direct Message to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
+          
+        twttr.anywhere(function (T) {
+          T.DirectMessage.send( id.substr(1,id.length - 1), msg, {success: function(){
+              backButton();              
+            }, error:function(){ 
+              alert("Error sending message to " + id); 
+              backButton();              
+            }});
+          });
+          
+          return false;
+        });
+        
+        return false;
+      }
+    });
+    
+    // the public reply to @user callback      
+    $(stitle + " .publicReplyButton").click( function(){
+
+      sendMessage("Reply to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
+        
+      twttr.anywhere(function (T) {
+        T.Status.reply( 0, msg, {success: function(){
+            backButton();              
+          }, error:function(){ 
+            alert("Error sending message to " + id); 
+            backButton();              
+          }});
+        });
+        
+        return false;
+      }, $(this).attr("status_id") + " ");
+      
+      return false;
+    });
+    
+    // the user's profile callback
+    $(stitle + " .profileButton").click( function(){
+      profile($(this).attr("status_id"));      
+      return false;
+    });
+    
+    // the tweet button callback
+    $(stitle + " .sendTweetButton").click( function(){
+
+      sendMessage("Send tweet", $(this).attr("status_id"), function(id,msg){
+        
+      twttr.anywhere(function (T) {
+        T.Status.update( msg, {success: function(){
+            backButton();
+          }, error:function(){ 
+            alert("Error sending tweet"); 
+            backButton();              
+          }});
+        });
+        
+        return false;
+      });
+      
+      return false;
+    });    
+          
+    // logout button callback
+    $(stitle + " .logoutButton").click( function(){          
+      twttr.anywhere.signOut();
+      return false;
+    });  
+  }
+  
+  // build the UL/LI table containing tweets for this page
+  function buildTweetTable(statuses)
+  {
     // build the ul/li markup for the statuses(tweets)
     var str = "";
     str += '<ul data-role="listview">';
@@ -373,329 +727,9 @@
     }
     
     str += '</ul>';   
-    
-    // build the title for this page
-    var rtitle = title;
-    if( title == "Timeline"){
-      screenName = myCurrentUser.data('screen_name');
-      rtitle = "@" + screenName + " Timeline";      
-    }
 
-    // build the page 'id' for this jquery mobile 'page' (we can't use @ or # in the name so we change the name)
-    var newtitle = title;
-    if( title[0] == '@')
-      newtitle = "AT_" + title.substr( 1, title.length - 1);
-    if( title[0] == '#')
-      newtitle = "LB_" + title.substr( 1, title.length - 1);
-      
-    // build the jquery selector for this 'page'
-    var stitle = '#' + newtitle;
-    
-    // is this page already in the DOM? If not, we clone the template then modify it
-    if( $(stitle).length <= 0)
-    {
-      var $clone = $("#default_page").clone();
-      
-      $clone.attr("id",newtitle);   // set the id of the 'page'
-      
-      $("#anywhere").after($clone); // put the clone in the DOM
-      
-      // store some internal data for the 'page'
-      jQuery.data( $(stitle)[0], "page_data", { title: title, id: stitle });
-      
-      var pagesel = stitle;
-      
-      // this attempts to workaround a problem with JQM. I was sometimes getting strange
-      // behavior with the fixed header and footer. They would sometimes hang in the middle
-      // of the page or disappear altogether. After some digging in the JQM sources, I found 
-      // the $.fixedToolbars function that appears to control these. The show command will force 
-      // them to display, so i tied that to the window.scroll() event. One other problem popped up
-      // where the header was showing below the normal 'content'. The fixed header/footer are set
-      // to z-index:1000 in the JQM CSS but for some reason that seemed to change?? so i also force 
-      // the z-index to 1000.
-      $(window).scroll( function(){   
-        $(pagesel).find("[data-role=header],[data-role=footer]").css("z-index","1000");
-        $.fixedToolbars.show(true);
-      });
-    
-      // set the page title and back button visible attribute
-      $( stitle + ' .rtitle').html(rtitle);    
-      $( stitle + ' .myheader').attr( 'data-nobackbtn', (phistory.length<=1)?'true':'false');
-     
-      // if this page is for an @user, we display the twitter follow user button
-      if( title[0] == '@'){   
-        twttr.anywhere(function (T) { 
-          $(stitle + " .follow-twitterapi").html("");
-          T(stitle + " .follow-twitterapi").followButton(title.substr(1,title.length - 1));
-        });
-      }      
-      
-      // workaround for strange bug cloning a page with search included
-      $( stitle + ' .content').prepend(
-  '    <form action="#" class="searchForm">'+
-  '      <div data-role="fieldcontain" style="padding:0; margin:0 0 20px 0;">'+
-//'        <label for="search">Search:</label>'+
-  '        <input type="search" name="search" class="search" value="" style="font-size:13px" />'+
-  '      </div>'+
-  '    </form>');
-      $( stitle + ' .searchForm').page(); // tell jQueryMobile to compile this block of HTML
-      
-      // setup the buttons on the footer
-      $(stitle + " .action-buttons").attr("status_id", title);
-      
-      // we hide the reply button and profile button except on User pages
-      if( mode != UserMode){
-        var selector = stitle + " a.publicReplyButton," + stitle + " a.profileButton";
-        $(selector).css("visibility","hidden");
-      }
-
-      // setup the search field callback
-      $(stitle + " .searchForm").submit( function(){
-      
-        // get the search string and call twitter search, then display the status results
-        var searchVal = $(stitle + " .search").attr("value");
-        var url = 'http://search.twitter.com/search.json?q=' + encodeURIComponent( searchVal);
-        
-        $.getJSONP({
-          url:url,
-          timeout: 30000,
-          data: {rpp:50},
-          error: function(xhr, status, e) {
-            alert( "An error occurred while fetching search results");
-          },
-          success: function(json) {
-            if (json.error) {
-              alert( "An error occurred while fetching search results");
-              return;
-            }
-
-           twttr.anywhere(function (T) {    
-              updateStatusPage(T, json.results, searchVal);            
-            });
-          }
-        });      
-        
-        return false;
-      });
-      
-      // the direct message to @user callback
-      $(stitle + " .directMsgButton").click( function(){
-      
-        if( title == 'DirectMessages')
-          return;
-          
-        if( title == 'Timeline'){      // Display all direct messages sent to and from current user
-
-          twttr.anywhere(function (T) {
-            T.User.current().directMessages( {count:50, success:function(receiveDMs){            
-              T.User.current().sentMessages( {count:50, success:function(sentDMs){
-                var myReceiveDMs = receiveDMs.array;
-                var newArray = myReceiveDMs.concat(sentDMs.array);
-                
-                var nowDate = new Date();      
-                newArray.sort( function (a,b) {
-                  var createdDateA = new Date(a.createdAt);
-                  var createdDateB = new Date(b.createdAt);
-                  
-                  var diffA = nowDate - createdDateA;
-                  var diffB = nowDate - createdDateB;                
-                  
-                  return diffA - diffB;
-                });
-                
-                updateStatusPage(T, newArray, "DirectMessages");            
-              }});            
-            }});
-          });
-          
-          return false;                  
-        }
-        else {		// send a Direct message to this user
-
-          sendMessage("Direct Message to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
-            
-          twttr.anywhere(function (T) {
-            T.DirectMessage.send( id.substr(1,id.length - 1), msg, {success: function(){
-                backButton();              
-              }, error:function(){ 
-                alert("Error sending message to " + id); 
-                backButton();              
-              }});
-            });
-            
-            return false;
-          });
-          
-          return false;
-        }
-      });
-      
-      // the public reply to @user callback      
-      $(stitle + " .publicReplyButton").click( function(){
-
-        sendMessage("Reply to " + $(this).attr("status_id"), $(this).attr("status_id"), function(id,msg){
-          
-        twttr.anywhere(function (T) {
-          T.Status.reply( 0, msg, {success: function(){
-              backButton();              
-            }, error:function(){ 
-              alert("Error sending message to " + id); 
-              backButton();              
-            }});
-          });
-          
-          return false;
-        }, $(this).attr("status_id") + " ");
-        
-        return false;
-      });
-      
-      // the user's profile callback
-      $(stitle + " .profileButton").click( function(){
-        profile($(this).attr("status_id"));      
-        return false;
-      });
-      
-      // the tweet button callback
-      $(stitle + " .sendTweetButton").click( function(){
-
-        sendMessage("Send tweet", $(this).attr("status_id"), function(id,msg){
-          
-        twttr.anywhere(function (T) {
-          T.Status.update( msg, {success: function(){
-              backButton();
-            }, error:function(){ 
-              alert("Error sending tweet"); 
-              backButton();              
-            }});
-          });
-          
-          return false;
-        });
-        
-        return false;
-      });    
-            
-      // logout button callback
-      $(stitle + " .logoutButton").click( function(){          
-        twttr.anywhere.signOut();
-        return false;
-      });              
-    }
-    
-    // clear out the tweet section of our page and insert the fresh data
-    $( stitle + ' .tweets').html("");
-    $( stitle + ' .tweets').append(str);
-    
-    $( stitle + " ul").page();  // now get jquerymobile to add its special markup to our markup
-  
-    if( mode != DMMode){
-
-      // install retweet button for each tweet
-      $(stitle + " span.ui-icon-arrow-r").before('<span style="right:10px; top:70%%;" class="ui-icon ui-icon-refresh"></span>');
-      $(stitle + " span.ui-icon-refresh").unbind();
-      $(stitle + " span.ui-icon-refresh").click( function(){
-        var id = $(this).closest("li.tweet-li").attr("data-tweet-id");  // get this tweet's id
-        
-        displayDialog( "Retweet", "Alert", "Are you sure that you want to send this retweet?", ["Yes","No"], id,
-          function(buttonIndex,id){
-            if( buttonIndex == '0'){  // send retweet
-              twttr.anywhere(function (T) {
-                T.Status.retweet(id);
-              });                          
-            } else {  // cancel retweet
-            }
-          });      
-        
-        return false;
-      });
-    }
-
-    // convert the embedded span tags into <a> tags. we did this because jqm manipulates <a> tags in unwanted ways
-    $(stitle + " span.atag").each( function(){
-      $(this).after( "<a class='aref' href='" + $(this).attr("href") + "'>" + $(this).attr("href") + "</a>");      
-    });
-        
-    $(stitle + " span.btag").each( function(){
-      $(this).after( "<a class='bref' href='" + $(this).attr("href") + "'>" + $(this).attr("href") + "</a>");      
-    });    
-        
-    // user pressed a @user or #subject embedded in the tweet
-    $(stitle + " a.bref").click( function(){
-      href = $(this).attr("href");
-      
-      fetchPage( href); // display the page associated with this @user or #subject
-      
-      return false;
-    });       
-    
-    // user pressed the thumbnail
-    $(stitle + " p," + stitle + " img," + stitle + " a.status_reply").unbind();
-    $(stitle + " p," + stitle + " a.status_reply").click( function(){ return false});
-
-    $(stitle + " img").click( function(){ 
-      var href = $(this).siblings().find("a.status_reply").attr("status_id");
-      
-      if( href != ('@' + myCurrentUser.data('screen_name')))
-        fetchPage( href); // display the page associated with this @user or #subject
-      
-      return false;   
-    });
-        
-    // button at the right of tweet (reply to tweet)
-    $(stitle + " span.ui-icon-arrow-r").unbind();
-    $(stitle + " span..ui-icon-arrow-r").click( function(){
-    
-      // find the owner of this tweet (stored in the $("a.status_reply) tag in attribute "status_id"
-      var id = $(this).siblings().find("a.status_reply").attr("status_id");
-      
-      if( mode == DMMode){
-      
-        if( id == ('@' + myCurrentUser.data('screen_name'))) // can't send a DM to yourself
-          return false;
-          
-        sendMessage("Direct Message to " + id, id, function(id,msg){
-          
-        twttr.anywhere(function (T) {
-          T.DirectMessage.send( id.substr(1,id.length - 1), msg, {success: function(){
-              backButton();              
-            }, error:function(){ 
-              alert("Error sending message to " + id); 
-              backButton();              
-            }});
-          });
-          
-          return false;
-        });
-        
-        return false;      
-      }
-      else {
-      
-        sendMessage("Reply to " + id, id, function(id,msg){
-          
-        twttr.anywhere(function (T) {
-          T.Status.reply( 0, msg, {success: function(){
-              backButton();                          
-            }, error:function(){ 
-              alert("Error sending message to " + id); 
-              backButton();                          
-            }});
-          });
-          
-          return false;
-        }, id + " ");
-        
-        return false;
-      }
-    });
-    
-    // if we want to display the page, we push our hash history and tell jqm to change the page
-    if( displayPage){
-      phistory[phistory.length] = title;                      
-      $.mobile.changePage(stitle); 
-    }          
-  }  // end updateStatusPage()
+    return str;
+  }
         
   // this is called on startup to see if we are already logged into twitter, if not, we display
   // a twitter connection button otherwise we display the home timeline statuses
