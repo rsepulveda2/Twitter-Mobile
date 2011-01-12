@@ -83,7 +83,7 @@
     phistory.length = phistory.length - 1;
     current = phistory[phistory.length - 1];
     
-    // now tell jquerymobile to display the top-of-stack page
+    // build the page 'id' for this jquery mobile 'page' (we can't use @ or # in the name so we change the name)    
     var newtitle = title = current;
     if( title[0] == '@')
       newtitle = "AT_" + title.substr( 1, title.length - 1);
@@ -92,6 +92,7 @@
       
     stitle = '#' + newtitle;
     
+    // now tell jquerymobile to display the top-of-stack page
     $.mobile.changePage($(stitle));          
   }
     

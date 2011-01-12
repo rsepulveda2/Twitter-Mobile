@@ -8,9 +8,11 @@ This is proof of concept code and is not very durable nor complete.
 
 Screenshots:
 
+<div style="background:white;">
 <img style="border: 1px solid black;" src="http://macdevshop.com/images/twitterHome.jpg" />&nbsp;&nbsp;&nbsp;<img style="border: 1px solid black;" src="http://macdevshop.com/images/twitterUser.jpg" /> 
 <br />
 <img style="border: 1px solid black;" src="http://macdevshop.com/images/twitterLogin.jpg" />&nbsp;&nbsp;&nbsp;<img style="border: 1px solid black;" src="http://macdevshop.com/images/twitterMessage.jpg" /> 
+</div>
 
 To try the code in action, visit:
 
